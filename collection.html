@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Collection · SuryaLab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main">
+    <div class="topbar" id="topbar"></div>
+
+    <h1>Collection</h1>
+    <p class="muted" style="margin-bottom:20px;">Billing summary by date range.</p>
+
+    <div class="panel">
+      <div class="form-grid" style="margin-bottom:10px;">
+        <div class="field"><label>From</label><input type="date" id="fromDate"></div>
+        <div class="field"><label>To</label><input type="date" id="toDate"></div>
+      </div>
+      <button class="btn btn-outline btn-sm" id="filterBtn">Apply Filter</button>
+    </div>
+
+    <div class="panel">
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Invoice</th><th>Date</th><th>Patient</th><th>Doctor</th><th>Amount</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="emptyState" style="display:none;">No collections in this range.</div>
+      <div class="panel" style="background:var(--mint-50);box-shadow:none;margin-top:14px;display:flex;justify-content:space-between;">
+        <strong>Total Collection</strong>
+        <strong id="totalAmt" style="color:var(--teal-900);">₹0</strong>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+<script>
+  SuryaDB.requireAuth('../');
+  renderShell('../', 'collection');
+
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('fromDate').value = today;
+  document.getElementById('toDate').value = today;
+
+  function render(){
+    const from = document.getElementById('fromDate').value;
+    const to = document.getElementById('toDate').value;
+    const patients = SuryaDB.getPatients().filter(p => p.date >= from && p.date <= to);
+    document.getElementById('emptyState').style.display = patients.length ? 'none' : 'block';
+    document.getElementById('rows').innerHTML = patients.map(p => `
+      <tr>
+        <td class="mono">${escapeHtml(p.invoiceNo)}</td>
+        <td>${formatDateDisplay(p.date)}</td>
+        <td>${escapeHtml(p.name)}</td>
+        <td>${escapeHtml(p.doctor || '-')}</td>
+        <td>${formatMoney(p.amount)}</td>
+      </tr>
+    `).join('');
+    const total = patients.reduce((sum,p) => sum + (p.amount||0), 0);
+    document.getElementById('totalAmt').textContent = formatMoney(total);
+  }
+  document.getElementById('filterBtn').addEventListener('click', render);
+  render();
+</script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard · SuryaLab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main">
+    <div class="topbar" id="topbar"></div>
+
+    <h1>Dashboard</h1>
+    <p class="muted" style="margin-bottom:20px;">Today at a glance</p>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="num" id="statPatients">0</div>
+        <div class="label">Today's Patients</div>
+      </div>
+      <div class="stat-card">
+        <div class="num" id="statCollection">₹0</div>
+        <div class="label">Today's Collection</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="num" id="statPending">0</div>
+        <div class="label">Pending Reports</div>
+      </div>
+    </div>
+
+    <h2 style="font-size:16px;margin-bottom:12px;">Menu</h2>
+    <div class="menu-grid">
+      <a class="menu-tile" href="test-entry.html"><span class="ic">📝</span>Test Entry</a>
+      <a class="menu-tile" href="report.html"><span class="ic">📄</span>Lab Report</a>
+      <a class="menu-tile" href="collection.html"><span class="ic">💰</span>Collection</a>
+      <a class="menu-tile" href="settings.html" id="settingsTile"><span class="ic">⚙️</span>Settings</a>
+      <a class="menu-tile" href="#" id="logoutTile"><span class="ic">🚪</span>Logout</a>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+<script>
+  const user = SuryaDB.requireAuth('../');
+  renderShell('../', 'dashboard');
+
+  const s = SuryaDB.stats();
+  document.getElementById('statPatients').textContent = s.todayPatients;
+  document.getElementById('statCollection').textContent = formatMoney(s.todayCollection);
+  document.getElementById('statPending').textContent = s.pendingReports;
+
+  if (user && user.role !== 'admin'){
+    document.getElementById('settingsTile').style.display = 'none';
+  }
+  document.getElementById('logoutTile').addEventListener('click', (e) => {
+    e.preventDefault();
+    SuryaDB.logout();
+    window.location.href = 'login.html';
+  });
+</script>
+</body>
+</html>

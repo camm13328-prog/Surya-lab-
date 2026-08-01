@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings · SuryaLab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main">
+    <div class="topbar" id="topbar"></div>
+
+    <div id="deniedBox" style="display:none;" class="panel">
+      <h2>Access denied</h2>
+      <p class="muted">Only Admin users can open Settings. Please contact your lab admin.</p>
+    </div>
+
+    <div id="settingsContent" style="display:none;">
+      <h1>Settings</h1>
+      <p class="muted" style="margin-bottom:20px;">Manage tests, packages, and users. Admin only.</p>
+
+      <!-- ===== Test Master ===== -->
+      <div class="panel">
+        <div class="panel-head"><h2 style="font-size:16px;">Test Master</h2></div>
+        <form id="testForm" class="form-grid" style="margin-bottom:14px;">
+          <input type="hidden" id="testId">
+          <div class="field"><label>Test Name</label><input type="text" id="testName" required></div>
+          <div class="field"><label>Rate (₹)</label><input type="number" id="testRate" required></div>
+          <div class="field"><label>Unit</label><input type="text" id="testUnit" placeholder="e.g. g/dL"></div>
+          <div class="field"><label>Normal Range</label><input type="text" id="testRange" placeholder="e.g. 13–17"></div>
+          <div class="field" style="align-self:end;">
+            <button type="submit" class="btn btn-primary">Save Test</button>
+            <button type="button" class="btn btn-outline" id="cancelTestEdit" style="display:none;">Cancel</button>
+          </div>
+        </form>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>Test</th><th>Rate</th><th>Unit</th><th>Normal Range</th><th></th></tr></thead>
+            <tbody id="testRows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ===== Package Master ===== -->
+      <div class="panel">
+        <div class="panel-head"><h2 style="font-size:16px;">Package Master</h2></div>
+        <form id="packageForm" style="margin-bottom:14px;">
+          <input type="hidden" id="packageId">
+          <div class="form-grid">
+            <div class="field"><label>Package Name</label><input type="text" id="packageName" required></div>
+            <div class="field"><label>Price (₹)</label><input type="number" id="packagePrice" required></div>
+          </div>
+          <label class="muted" style="display:block;margin:10px 0 6px;">Included Tests</label>
+          <div class="checklist" id="packageTestChecklist"></div>
+          <div class="actions" style="margin-top:12px;">
+            <button type="submit" class="btn btn-primary">Save Package</button>
+            <button type="button" class="btn btn-outline" id="cancelPackageEdit" style="display:none;">Cancel</button>
+          </div>
+        </form>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>Package</th><th>Tests Included</th><th>Price</th><th></th></tr></thead>
+            <tbody id="packageRows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ===== Users ===== -->
+      <div class="panel">
+        <div class="panel-head"><h2 style="font-size:16px;">Users</h2></div>
+        <form id="userForm" class="form-grid" style="margin-bottom:14px;">
+          <div class="field"><label>Full Name</label><input type="text" id="userName" required></div>
+          <div class="field"><label>Username</label><input type="text" id="userUsername" required></div>
+          <div class="field"><label>Password</label><input type="text" id="userPassword" required></div>
+          <div class="field">
+            <label>Role</label>
+            <select id="userRole"><option value="staff">Staff</option><option value="admin">Admin</option></select>
+          </div>
+          <div class="field" style="align-self:end;"><button type="submit" class="btn btn-primary">Add User</button></div>
+        </form>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>Name</th><th>Username</th><th>Role</th><th></th></tr></thead>
+            <tbody id="userRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+<script>
+  const user = SuryaDB.requireAuth('../');
+  renderShell('../', 'settings');
+
+  if (user.role !== 'admin'){
+    document.getElementById('deniedBox').style.display = 'block';
+  } else {
+    document.getElementById('settingsContent').style.display = 'block';
+    initTests();
+    initPackages();
+    initUsers();
+  }
+
+  /* ---------------- Test Master ---------------- */
+  function initTests(){
+    function renderTests(){
+      document.getElementById('testRows').innerHTML = SuryaDB.getTests().map(t => `
+        <tr>
+          <td>${escapeHtml(t.name)}</td><td>${formatMoney(t.rate)}</td>
+          <td>${escapeHtml(t.unit)}</td><td>${escapeHtml(t.range)}</td>
+          <td class="actions">
+            <button class="btn btn-sm btn-outline" data-edit="${t.id}">Edit</button>
+            <button class="btn btn-sm btn-danger" data-del="${t.id}">Delete</button>
+          </td>
+        </tr>`).join('');
+      document.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
+        const t = SuryaDB.getTests().find(x => x.id === b.dataset.edit);
+        document.getElementById('testId').value = t.id;
+        document.getElementById('testName').value = t.name;
+        document.getElementById('testRate').value = t.rate;
+        document.getElementById('testUnit').value = t.unit;
+        document.getElementById('testRange').value = t.range;
+        document.getElementById('cancelTestEdit').style.display = 'inline-block';
+      }));
+      document.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+        if (confirm('Delete this test?')){ SuryaDB.deleteTest(b.dataset.del); renderTests(); renderPackageChecklist(); }
+      }));
+    }
+    document.getElementById('testForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      SuryaDB.saveTest({
+        id: document.getElementById('testId').value || null,
+        name: document.getElementById('testName').value.trim(),
+        rate: Number(document.getElementById('testRate').value),
+        unit: document.getElementById('testUnit').value.trim() || '-',
+        range: document.getElementById('testRange').value.trim() || '-'
+      });
+      e.target.reset();
+      document.getElementById('testId').value = '';
+      document.getElementById('cancelTestEdit').style.display = 'none';
+      renderTests();
+      renderPackageChecklist();
+    });
+    document.getElementById('cancelTestEdit').addEventListener('click', () => {
+      document.getElementById('testForm').reset();
+      document.getElementById('testId').value = '';
+      document.getElementById('cancelTestEdit').style.display = 'none';
+    });
+    renderTests();
+  }
+
+  /* ---------------- Package Master ---------------- */
+  function renderPackageChecklist(selectedIds){
+    const sel = new Set(selectedIds || []);
+    document.getElementById('packageTestChecklist').innerHTML = SuryaDB.getTests().map(t => `
+      <label><input type="checkbox" class="pkg-test-chk" value="${t.id}" ${sel.has(t.id)?'checked':''}> ${escapeHtml(t.name)}</label>
+    `).join('');
+  }
+  function initPackages(){
+    renderPackageChecklist();
+    function renderPackages(){
+      const tests = SuryaDB.getTests();
+      document.getElementById('packageRows').innerHTML = SuryaDB.getPackages().map(p => `
+        <tr>
+          <td>${escapeHtml(p.name)}</td>
+          <td>${p.tests.map(id => escapeHtml((tests.find(t=>t.id===id)||{}).name || '')).join(', ')}</td>
+          <td>${formatMoney(p.price)}</td>
+          <td class="actions">
+            <button class="btn btn-sm btn-outline" data-edit="${p.id}">Edit</button>
+            <button class="btn btn-sm btn-danger" data-del="${p.id}">Delete</button>
+          </td>
+        </tr>`).join('');
+      document.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
+        const p = SuryaDB.getPackages().find(x => x.id === b.dataset.edit);
+        if (!p) return;
+        document.getElementById('packageId').value = p.id;
+        document.getElementById('packageName').value = p.name;
+        document.getElementById('packagePrice').value = p.price;
+        renderPackageChecklist(p.tests);
+        document.getElementById('cancelPackageEdit').style.display = 'inline-block';
+      }));
+      document.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+        if (confirm('Delete this package?')){ SuryaDB.deletePackage(b.dataset.del); renderPackages(); }
+      }));
+    }
+    document.getElementById('packageForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const testIds = Array.from(document.querySelectorAll('.pkg-test-chk:checked')).map(cb => cb.value);
+      if (testIds.length === 0){ alert('Select at least one test for the package.'); return; }
+      SuryaDB.savePackage({
+        id: document.getElementById('packageId').value || null,
+        name: document.getElementById('packageName').value.trim(),
+        price: Number(document.getElementById('packagePrice').value),
+        tests: testIds
+      });
+      e.target.reset();
+      document.getElementById('packageId').value = '';
+      document.getElementById('cancelPackageEdit').style.display = 'none';
+      renderPackageChecklist();
+      renderPackages();
+    });
+    document.getElementById('cancelPackageEdit').addEventListener('click', () => {
+      document.getElementById('packageForm').reset();
+      document.getElementById('packageId').value = '';
+      renderPackageChecklist();
+      document.getElementById('cancelPackageEdit').style.display = 'none';
+    });
+    renderPackages();
+  }
+
+  /* ---------------- Users ---------------- */
+  function initUsers(){
+    function renderUsers(){
+      const users = JSON.parse(localStorage.getItem('suryalab_users') || '[]');
+      document.getElementById('userRows').innerHTML = users.map(u => `
+        <tr>
+          <td>${escapeHtml(u.name)}</td><td>${escapeHtml(u.username)}</td><td>${escapeHtml(u.role)}</td>
+          <td>${u.username !== 'admin' ? `<button class="btn btn-sm btn-danger" data-del="${u.id}">Delete</button>` : ''}</td>
+        </tr>`).join('');
+      document.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+        if (!confirm('Remove this user?')) return;
+        const users = JSON.parse(localStorage.getItem('suryalab_users') || '[]').filter(u => u.id !== b.dataset.del);
+        localStorage.setItem('suryalab_users', JSON.stringify(users));
+        renderUsers();
+      }));
+    }
+    document.getElementById('userForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const users = JSON.parse(localStorage.getItem('suryalab_users') || '[]');
+      users.push({
+        id: 'u' + Date.now(),
+        name: document.getElementById('userName').value.trim(),
+        username: document.getElementById('userUsername').value.trim(),
+        password: document.getElementById('userPassword').value,
+        role: document.getElementById('userRole').value
+      });
+      localStorage.setItem('suryalab_users', JSON.stringify(users));
+      e.target.reset();
+      renderUsers();
+    });
+    renderUsers();
+  }
+</script>
+</body>
+</html>

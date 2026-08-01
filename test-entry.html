@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test Entry · SuryaLab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main">
+    <div class="topbar" id="topbar"></div>
+
+    <h1>Patient / Test Entry</h1>
+    <p class="muted" style="margin-bottom:20px;">Register a patient and select the tests to be done.</p>
+
+    <div class="panel">
+      <form id="patientForm">
+        <div class="form-grid">
+          <div class="field">
+            <label>Invoice No</label>
+            <input type="text" id="invoiceNo" class="mono" readonly>
+          </div>
+          <div class="field">
+            <label>Date</label>
+            <input type="date" id="date" required>
+          </div>
+          <div class="field">
+            <label>Patient Name</label>
+            <input type="text" id="name" required>
+          </div>
+          <div class="field">
+            <label>Age</label>
+            <input type="number" id="age" min="0" required>
+          </div>
+          <div class="field">
+            <label>Sex</label>
+            <select id="sex">
+              <option>Male</option><option>Female</option><option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Mobile</label>
+            <input type="tel" id="mobile">
+          </div>
+          <div class="field">
+            <label>Doctor</label>
+            <input type="text" id="doctor" placeholder="Referring doctor">
+          </div>
+          <div class="field">
+            <label>Place</label>
+            <input type="text" id="place">
+          </div>
+        </div>
+
+        <h3 style="margin-top:18px;font-size:15px;">Packages</h3>
+        <div class="checklist" id="packageChecklist"></div>
+
+        <h3 style="margin-top:10px;font-size:15px;">Individual Tests</h3>
+        <div class="checklist" id="testChecklist"></div>
+
+        <div class="panel" style="background:var(--mint-50);box-shadow:none;margin-top:16px;display:flex;justify-content:space-between;align-items:center;">
+          <span>Total Amount</span>
+          <strong id="totalAmount" style="font-size:20px;color:var(--teal-900);">₹0</strong>
+        </div>
+
+        <div class="actions" style="margin-top:16px;">
+          <button type="submit" class="btn btn-primary">Save Patient</button>
+          <button type="button" class="btn btn-outline" id="printBtn">Print Slip</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2 style="font-size:16px;">Recent Patients</h2></div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Invoice</th><th>Date</th><th>Name</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+          <tbody id="patientRows"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="emptyState" style="display:none;">No patients yet. Add one above.</div>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+<script>
+  SuryaDB.requireAuth('../');
+  renderShell('../', 'test-entry');
+
+  const tests = SuryaDB.getTests();
+  const packages = SuryaDB.getPackages();
+
+  document.getElementById('invoiceNo').value = SuryaDB.nextInvoiceNo();
+  document.getElementById('date').value = new Date().toISOString().slice(0,10);
+
+  const pkgBox = document.getElementById('packageChecklist');
+  pkgBox.innerHTML = packages.map(p => `
+    <label><input type="checkbox" class="pkg-chk" value="${p.id}"> ${escapeHtml(p.name)} — ${formatMoney(p.price)}</label>
+  `).join('') || '<span class="muted">No packages set up yet.</span>';
+
+  const testBox = document.getElementById('testChecklist');
+  testBox.innerHTML = tests.map(t => `
+    <label><input type="checkbox" class="test-chk" value="${t.id}"> ${escapeHtml(t.name)} — ${formatMoney(t.rate)}</label>
+  `).join('') || '<span class="muted">No tests set up yet.</span>';
+
+  function selectedPackageTestIds(){
+    const ids = new Set();
+    document.querySelectorAll('.pkg-chk:checked').forEach(cb => {
+      const pkg = packages.find(p => p.id === cb.value);
+      if (pkg) pkg.tests.forEach(id => ids.add(id));
+    });
+    return ids;
+  }
+
+  function recalc(){
+    const pkgTestIds = selectedPackageTestIds();
+    // grey out & auto-tick tests included in a chosen package
+    document.querySelectorAll('.test-chk').forEach(cb => {
+      if (pkgTestIds.has(cb.value)){
+        cb.checked = true;
+        cb.disabled = true;
+      } else {
+        cb.disabled = false;
+      }
+    });
+
+    let total = 0;
+    document.querySelectorAll('.pkg-chk:checked').forEach(cb => {
+      const pkg = packages.find(p => p.id === cb.value);
+      if (pkg) total += pkg.price;
+    });
+    document.querySelectorAll('.test-chk:checked').forEach(cb => {
+      if (!pkgTestIds.has(cb.value)){
+        const t = tests.find(x => x.id === cb.value);
+        if (t) total += t.rate;
+      }
+    });
+    document.getElementById('totalAmount').textContent = formatMoney(total);
+    return total;
+  }
+  document.querySelectorAll('.pkg-chk, .test-chk').forEach(cb => cb.addEventListener('change', recalc));
+  recalc();
+
+  function renderPatients(){
+    const patients = SuryaDB.getPatients().slice().reverse();
+    document.getElementById('emptyState').style.display = patients.length ? 'none' : 'block';
+    document.getElementById('patientRows').innerHTML = patients.map(p => {
+      const done = SuryaDB.isReportComplete(p.id);
+      return `<tr>
+        <td class="mono">${escapeHtml(p.invoiceNo)}</td>
+        <td>${formatDateDisplay(p.date)}</td>
+        <td>${escapeHtml(p.name)}</td>
+        <td>${formatMoney(p.amount)}</td>
+        <td><span class="badge ${done?'badge-done':'badge-pending'}">${done?'Done':'Pending'}</span></td>
+        <td><a class="btn btn-sm btn-outline" href="report.html?patient=${p.id}">Report</a></td>
+      </tr>`;
+    }).join('');
+  }
+  renderPatients();
+
+  document.getElementById('patientForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const testIds = Array.from(document.querySelectorAll('.test-chk:checked')).map(cb => cb.value);
+    const packageIds = Array.from(document.querySelectorAll('.pkg-chk:checked')).map(cb => cb.value);
+    if (testIds.length === 0){
+      alert('Please select at least one test or package.');
+      return;
+    }
+    const amount = recalc();
+    SuryaDB.addPatient({
+      date: document.getElementById('date').value,
+      name: document.getElementById('name').value.trim(),
+      age: document.getElementById('age').value,
+      sex: document.getElementById('sex').value,
+      mobile: document.getElementById('mobile').value.trim(),
+      doctor: document.getElementById('doctor').value.trim(),
+      place: document.getElementById('place').value.trim(),
+      testIds, packageIds, amount
+    });
+    e.target.reset();
+    document.getElementById('invoiceNo').value = SuryaDB.nextInvoiceNo();
+    document.getElementById('date').value = new Date().toISOString().slice(0,10);
+    recalc();
+    renderPatients();
+  });
+
+  document.getElementById('printBtn').addEventListener('click', () => window.print());
+</script>
+</body>
+</html>

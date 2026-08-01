@@ -1,0 +1,8 @@
+[
+  {
+    "id": "p1",
+    "name": "Fever Package",
+    "tests": ["t2", "t3", "t4", "t5", "t6"],
+    "price": 950
+  }
+]

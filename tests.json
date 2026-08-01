@@ -1,0 +1,10 @@
+[
+  { "id": "t1", "name": "Hb (Hemoglobin)", "rate": 120, "unit": "g/dL", "range": "13–17" },
+  { "id": "t2", "name": "CBC", "rate": 350, "unit": "-", "range": "-" },
+  { "id": "t3", "name": "CRP", "rate": 400, "unit": "mg/L", "range": "0–5" },
+  { "id": "t4", "name": "ESR", "rate": 150, "unit": "mm/hr", "range": "0–20" },
+  { "id": "t5", "name": "Typhoid (Widal)", "rate": 250, "unit": "-", "range": "Negative" },
+  { "id": "t6", "name": "Dengue NS1", "rate": 500, "unit": "-", "range": "Negative" },
+  { "id": "t7", "name": "Blood Sugar (Fasting)", "rate": 80, "unit": "mg/dL", "range": "70–100" },
+  { "id": "t8", "name": "Urine Routine", "rate": 150, "unit": "-", "range": "Normal" }
+]
